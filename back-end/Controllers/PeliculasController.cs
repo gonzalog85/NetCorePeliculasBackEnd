@@ -13,7 +13,7 @@ namespace back_end.Controllers
 {
     [Route("api/peliculas")]
     [ApiController]
-    public class PeliculasController: ControllerBase
+    public class PeliculasController : ControllerBase
     {
         private readonly ApplicationDbContext context;
         private readonly IMapper mapper;
@@ -25,6 +25,22 @@ namespace back_end.Controllers
             this.context = context;
             this.mapper = mapper;
             this.almacenadorArchivos = almacenadorArchivos;
+        }
+
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<PeliculaDTO>> Get(int id)
+        {
+            var pelicula = await context.Peliculas
+                .Include(x => x.PeliculasGeneros).ThenInclude(x => x.Genero)
+                .Include(x => x.PeliculasActores).ThenInclude(x => x.Actor)
+                .Include(x => x.PeliculasCines).ThenInclude(x => x.Cine)
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if(pelicula == null) { return NotFound(); }
+
+            var dto = mapper.Map<PeliculaDTO>(pelicula);
+            dto.Actores = dto.Actores.OrderBy(x => x.Orden).ToList();
+            return dto;
         }
 
         [HttpPost]
