@@ -27,6 +27,31 @@ namespace back_end.Controllers
             this.almacenadorArchivos = almacenadorArchivos;
         }
 
+        [HttpGet]
+        public async Task<ActionResult<LandingPageDTO>> Get()
+        {
+            var top = 6;
+            var hoy = DateTime.Today;
+
+            var proximosEstrenos = await context.Peliculas
+                .Where(x => x.FechaLanzamiento > hoy)
+                .OrderBy(x => x.FechaLanzamiento)
+                .Take(top)
+                .ToListAsync();
+
+            var enCines = await context.Peliculas
+                .Where(x => x.EnCines)
+                .OrderBy(x => x.FechaLanzamiento)
+                .Take(top)
+                .ToListAsync();
+
+            var resultado = new LandingPageDTO();
+            resultado.ProximosEstrenos = mapper.Map<List<PeliculaDTO>>(proximosEstrenos);
+            resultado.EnCines = mapper.Map<List<PeliculaDTO>>(enCines);
+
+            return resultado;
+        }
+
         [HttpGet("{id:int}")]
         public async Task<ActionResult<PeliculaDTO>> Get(int id)
         {
@@ -36,7 +61,7 @@ namespace back_end.Controllers
                 .Include(x => x.PeliculasCines).ThenInclude(x => x.Cine)
                 .FirstOrDefaultAsync(x => x.Id == id);
 
-            if(pelicula == null) { return NotFound(); }
+            if (pelicula == null) { return NotFound(); }
 
             var dto = mapper.Map<PeliculaDTO>(pelicula);
             dto.Actores = dto.Actores.OrderBy(x => x.Orden).ToList();
@@ -44,7 +69,7 @@ namespace back_end.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult>Post([FromForm] PeliculaCreacionDTO peliculaCreacionDTO)
+        public async Task<ActionResult> Post([FromForm] PeliculaCreacionDTO peliculaCreacionDTO)
         {
             var pelicula = mapper.Map<Pelicula>(peliculaCreacionDTO);
 
@@ -72,10 +97,66 @@ namespace back_end.Controllers
             return new PeliculasPostGetDTO() { Cines = cinesDTO, Generos = generosDTO };
         }
 
+        [HttpGet("PutGet/{id:int}")]
+        public async Task<ActionResult<PeliculasPutGetDTO>> PutGet(int id)
+        {
+            var peliculaActionResult = await Get(id);
+            if (peliculaActionResult.Result is NotFoundResult) { return NotFound(); }
+
+            var pelicula = peliculaActionResult.Value;
+
+            var generosSeleccionadosIds = pelicula.Generos.Select(x => x.Id).ToList();
+            var generosNoSeleccionadosIds = await context.Generos
+                .Where(x => !generosSeleccionadosIds.Contains(x.Id))
+                .ToListAsync();
+
+            var cinesSeleccionadosIds = pelicula.Cines.Select(x => x.Id).ToList();
+            var cinesNoSeleccionadosIds = await context.Cines
+                .Where(x => !cinesSeleccionadosIds.Contains(x.Id))
+                .ToListAsync();
+
+            var generosNoSeleccionadosDTO = mapper.Map<List<GeneroDTO>>(generosNoSeleccionadosIds);
+            var cinesNoSeleccionadosDTO = mapper.Map<List<CineDTO>>(cinesNoSeleccionadosIds);
+
+            var respuesta = new PeliculasPutGetDTO();
+            respuesta.Pelicula = pelicula;
+            respuesta.GenerosSeleccionados = pelicula.Generos;
+            respuesta.GenerosNoSeleccionados = generosNoSeleccionadosDTO;
+            respuesta.CinesSeleccionados = pelicula.Cines;
+            respuesta.CinesNoSeleccionados = cinesNoSeleccionadosDTO;
+            respuesta.Actores = pelicula.Actores;
+
+            return respuesta;
+        }
+
+        [HttpPut("{id:int}")]
+        public async Task<ActionResult> Put(int id, [FromForm] PeliculaCreacionDTO peliculaCreacionDTO)
+        {
+            var pelicula = await context.Peliculas
+                .Include(x => x.PeliculasActores)
+                .Include(x => x.PeliculasGeneros)
+                .Include(x => x.PeliculasCines)
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (pelicula == null) { return NotFound(); }
+
+            pelicula = mapper.Map(peliculaCreacionDTO, pelicula);
+
+            if (peliculaCreacionDTO.Poster != null)
+            {
+                pelicula.Poster = await almacenadorArchivos.EditarArchivo(contenedor, peliculaCreacionDTO.Poster, pelicula.Poster);
+            }
+
+            EscribirOrdenActores(pelicula);
+
+            await context.SaveChangesAsync();
+            return NoContent();
+        }
+
         private static void EscribirOrdenActores(Pelicula pelicula)
         {
 
-            if(pelicula.PeliculasActores != null)
+            if (pelicula.PeliculasActores != null)
             {
                 for (int i = 0; i < pelicula.PeliculasActores.Count; i++)
                 {
