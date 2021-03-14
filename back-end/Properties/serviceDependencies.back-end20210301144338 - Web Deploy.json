@@ -1,0 +1,22 @@
+{
+  "dependencies": {
+    "storage1": {
+      "type": "storage",
+      "connectionId": "",
+      "suggestion": "true",
+      "ignored": "true"
+    },
+    "mssql1": {
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourcegroups/[parameters('resourceGroupName')]/providers/Microsoft.Sql/servers/back-enddbserver1785/databases/back-end_db",
+      "type": "mssql.azure",
+      "connectionId": "defaultConnection",
+      "secretStore": "AzureAppSettings"
+    },
+    "storage2": {
+      "type": "storage",
+      "connectionId": "connectionStrings/AzureStorage",
+      "suggestion": "true",
+      "ignored": "true"
+    }
+  }
+}
